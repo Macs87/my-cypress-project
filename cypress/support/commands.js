@@ -24,3 +24,12 @@
 // -- This will overwrite an existing command --
 // Cypress.Commands.overwrite('visit', (originalFn, url, options) => { ... })
 import 'cypress-real-events/support';
+
+Cypress.Commands.add('login', () => {
+    cy.visit('/login');
+    cy.get('input[type=email]').type(Cypress.env('email'));
+    cy.get('input[type=password]').type(Cypress.env('password'));
+    cy.get('button[type=button]').click().then(() => {
+        cy.get('button').find('span').contains('Test User').should('be.visible')
+    })
+});

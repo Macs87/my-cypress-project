@@ -30,50 +30,51 @@ describe('Trucks Page Tests', () => {
     });
   
     it('Backend Data Test - Trucks information is fetched from backend', () => {
-        cy.intercept('GET', '/api/v1/trucks?page=1&page_size=10&archived=false').as('getTrucks');
-        cy.visit('https://dev.omni-dispatch.com/fleets/trucks');
-        cy.wait('@getTrucks').then((interception) => {
-          expect(interception.response.statusCode).to.eq(200);
-          expect(interception.response.body).to.have.property('total').that.is.greaterThan(0);
-          
-        });
-      });
+      cy.intercept('GET', '/api/v1/trucks?page=1&page_size=10&archived=false').as('getTrucks');
+      cy.wait('@getTrucks').its('response.statusCode').should('eq', 200);
+      cy.get('@getTrucks').then(interception => {
+        const response = interception.response.body;
+        const items = response.items;
   
-    
-      it('Dims & payload validation', () => {
-        cy.intercept('GET', '/api/v1/trucks?page=1&page_size=10&archived=false').as('getTrucks');
-    
-        cy.wait('@getTrucks').then((interception) => {
-          expect(interception.response.statusCode).to.eq(200);
-    
-          cy.log(JSON.stringify(interception.response.body));
-        });
-      });
-  
-      it('Filter Functional Test - Test a filter', () => {
-             
-        
-        cy.url().should('include', '/fleets/trucks');
-        cy.get('[data-qa="number"]').should('be.visible');
-        cy.get('[data-qa="truck-type"]').should('be.visible');
-        cy.get('[data-qa="truck-status"]').should('be.visible');
-        cy.get('[data-qa="truck-phone"]').should('be.visible');
-        cy.get('[class="v-table__wrapper"]').find('table').should('be.visible');
-    
-        cy.intercept('GET', '/api/v1/trucks?page=1&page_size=10&archived=false').as('getTrucks');
-        cy.visit('https://dev.omni-dispatch.com/fleets/trucks');
-        cy.wait('@getTrucks').then((interception) => {
-            const trucksFromBackend = interception.response.body.items; // Припустимо, що тут зберігаються дані про вантажівки
-            
-            // Перевіряємо дані в кожному рядку таблиці
-            trucksFromBackend.forEach((truck, index) => {
-                cy.get('table tbody tr').eq(index).within(() => {
-                    // Перевіряємо наявність і вміст внутрішнього div з класом 'text-grey-darken-3' і атрибутом data-qa="truck-trailer-dims"
-                    cy.get('td.v-data-table__td.v-data-table-column--align-right > div.text-grey-darken-3[data-qa="truck-trailer-dims"]')
-                        .should('contain', '168″ х 90″ x 90″');
-                });
+        cy.get('div[class=v-table__wrapper] tbody tr').each(($row, index) => {
+          const item = items[index];
+          if (item.trailer) {
+            const trailer = item.trailer;
+            cy.wrap($row).within(() => {
+              // cy.get('[data-qa=truck-trailer-dims]').should('contain.text', trailer.length.toString() + '″ х ' + trailer.min_height.toString() + '″ x ' + trailer.min_width.toString() +'″ ');
+              cy.get('[data-qa=truck-trailer-dims]').should('contain.text', trailer.length.toString());
+              cy.get('[data-qa=truck-trailer-dims]').should('contain.text', trailer.min_height.toString());
+              cy.get('[data-qa=truck-trailer-dims]').should('contain.text', trailer.min_width.toString());
+              cy.get('[data-qa=truck-trailer-dims]').siblings().should('contain.text', trailer.payload.toString() + ' lbs');
             });
+          } else {
+            cy.log(`Property trailer in item with index ${index} is null.`);
+          }
         });
-
       });
+    });
+  
+  
+    it('Filter Functional Test - Test a filter', () => {
+      let searchWord = 'Truck3';
+
+      cy.intercept('GET', '/api/v1/trucks?number=Truck3&page=1&page_size=10&archived=false').as('getTrucks');
+      cy.get('form').find('.v-row').children().contains('Main information');
+      cy.get('[data-qa=number]').find('label').contains('Number').parent().type(searchWord);
+      cy.get('[id=search--apply-btn]').click();
+      cy.wait('@getTrucks').its('response.statusCode').should('eq', 200);
+      cy.get('a[data-qa=truck-number]').each(($el) => {
+        cy.wrap($el).should('contain.text', searchWord);
+        })
+      })
+
+    it('should have "number" filter that works correctly with NOTvalid search word', () => {
+      let searchWord = 'Truck6';
+
+      cy.intercept('GET', '/api/v1/trucks?number=Truck6&page=1&page_size=10&archived=false').as('getTrucks');
+      cy.get('[data-qa=number]').find('label').contains('Number').parent().type(searchWord);
+      cy.get('[id=search--apply-btn]').click();
+      cy.wait('@getTrucks').its('response.statusCode').should('eq', 200);
+      cy.get('td[colspan=6]').contains('No data available')
+    })
   });
